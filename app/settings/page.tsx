@@ -1,20 +1,64 @@
 "use client"
 
-import { useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Switch } from "@/components/ui/switch"
-import { Slider } from "@/components/ui/slider"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Slider } from "@/components/ui/slider"
+import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Moon, Sun, Zap, MessageSquare, Trash2 } from "lucide-react"
+import { useChatService } from "@/hooks/use-chat-service"
+import { Download, Moon, Sun, Trash2, Zap } from "lucide-react"
+import { useTheme } from "next-themes"
+import { useState } from "react"
+import { toast } from "sonner"
 
 export default function SettingsPage() {
-  const [theme, setTheme] = useState("light")
+  const { theme, setTheme } = useTheme()
   const [model, setModel] = useState("gpt-4o")
   const [temperature, setTemperature] = useState([0.7])
   const [saveHistory, setSaveHistory] = useState(true)
   const [notifications, setNotifications] = useState(false)
+  const { chatState, clearAllSessions } = useChatService()
+
+  const handleClearAllData = () => {
+    if (window.confirm('Are you sure you want to clear all chat history? This cannot be undone.')) {
+      clearAllSessions()
+      toast.success('All chat history has been cleared')
+    }
+  }
+
+  const handleExportChats = () => {
+    try {
+      // Create a JSON blob with the chat data
+      const dataStr = JSON.stringify(chatState.sessions, null, 2)
+      const blob = new Blob([dataStr], { type: 'application/json' })
+      
+      // Create a download link and trigger it
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `chat-export-${new Date().toISOString().split('T')[0]}.json`
+      document.body.appendChild(link)
+      link.click()
+      
+      // Clean up
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
+      
+      toast.success('Chat history exported successfully')
+    } catch (error) {
+      console.error('Error exporting chats:', error)
+      toast.error('Failed to export chat history')
+    }
+  }
+
+  const handleSaveHistoryChange = (checked: boolean) => {
+    setSaveHistory(checked)
+    if (!checked && window.confirm('Turning this off will clear your current chat history. Continue?')) {
+      clearAllSessions()
+      toast.success('Chat history preferences updated')
+    }
+  }
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
@@ -100,7 +144,7 @@ export default function SettingsPage() {
               <Label htmlFor="save-history">Save Chat History</Label>
               <div className="text-sm text-gray-500">Store your conversations for future reference</div>
             </div>
-            <Switch id="save-history" checked={saveHistory} onCheckedChange={setSaveHistory} />
+            <Switch id="save-history" checked={saveHistory} onCheckedChange={handleSaveHistoryChange} />
           </div>
 
           <div className="space-y-4">
@@ -109,14 +153,24 @@ export default function SettingsPage() {
               Manage your data and privacy settings. Clearing your data will permanently delete all your chat history.
             </p>
             <div className="flex space-x-4">
-              <Button variant="outline" className="flex items-center">
-                <MessageSquare className="mr-2 h-4 w-4" />
+              <Button variant="outline" className="flex items-center" onClick={handleExportChats}>
+                <Download className="mr-2 h-4 w-4" />
                 Export Chats
               </Button>
-              <Button variant="destructive" className="flex items-center">
+              <Button 
+                variant="destructive" 
+                className="flex items-center"
+                onClick={handleClearAllData}
+                disabled={chatState.sessions.length === 0}
+              >
                 <Trash2 className="mr-2 h-4 w-4" />
                 Clear All Data
               </Button>
+            </div>
+            <div className="text-sm text-gray-500">
+              {chatState.sessions.length > 0 
+                ? `You currently have ${chatState.sessions.length} saved chat${chatState.sessions.length > 1 ? 's' : ''}`
+                : 'You don\'t have any saved chats'}
             </div>
           </div>
         </TabsContent>

@@ -1,27 +1,33 @@
 "use client"
 
-import type React from "react"
-
-import { useState } from "react"
-import { useChat } from "ai/react"
-import { Send, Bot, User, Loader2 } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Textarea } from "@/components/ui/textarea"
+import ChatInput from "@/components/message/ChatInput"
+import ChatMessage from "@/components/message/ChatMessage"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { cn } from "@/lib/utils"
+import { useChatService } from "@/hooks/use-chat-service"
+import { Bot } from "lucide-react"
+import { useEffect } from "react"
 
 export default function ChatPage() {
-  const { messages, input, handleInputChange, handleSubmit, isLoading } = useChat({
-    api: "/api/chat",
-  })
-  const [inputHeight, setInputHeight] = useState("h-12")
+  const { 
+    currentSession, 
+    isLoading, 
+    sendMessage, 
+    startNewChat
+  } = useChatService();
+  
+  // Automatically create a new chat session if none exists
+  useEffect(() => {
+    if (!currentSession) {
+      startNewChat();
+    }
+  }, [currentSession]);
 
-  const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    handleInputChange(e)
-    // Adjust height based on content
-    const height = Math.min(e.target.scrollHeight, 200)
-    setInputHeight(height <= 48 ? "h-12" : `h-[${height}px]`)
-  }
+  const handleSendMessage = (message: string) => {
+    sendMessage(message);
+  };
+
+  // Get messages from the current session
+  const messages = currentSession?.messages || [];
 
   return (
     <div className="flex flex-col h-[calc(100vh-4rem)] max-w-4xl mx-auto px-4">
@@ -40,54 +46,14 @@ export default function ChatPage() {
           <ScrollArea className="h-full pr-4">
             <div className="space-y-6 py-6">
               {messages.map((message) => (
-                <div
-                  key={message.id}
-                  className={cn(
-                    "flex items-start gap-4 rounded-lg p-4",
-                    message.role === "user" ? "bg-gray-100" : "bg-gray-50 border border-gray-100",
-                  )}
-                >
-                  <div className="flex-shrink-0">
-                    {message.role === "user" ? (
-                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-300">
-                        <User className="h-5 w-5 text-white" />
-                      </div>
-                    ) : (
-                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-500">
-                        <Bot className="h-5 w-5 text-white" />
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex-1 space-y-2">
-                    <div className="font-medium">{message.role === "user" ? "You" : "Assistant"}</div>
-                    <div className="prose prose-sm">{message.content}</div>
-                  </div>
-                </div>
+                <ChatMessage key={message.id} message={message} />
               ))}
             </div>
           </ScrollArea>
         )}
       </div>
 
-      <div className="border-t py-4">
-        <form onSubmit={handleSubmit} className="relative">
-          <Textarea
-            value={input}
-            onChange={handleTextareaChange}
-            placeholder="Type your message..."
-            className={cn("pr-12 resize-none py-3", inputHeight)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault()
-                handleSubmit(e as any)
-              }
-            }}
-          />
-          <Button type="submit" size="icon" className="absolute right-2 bottom-2" disabled={isLoading || !input.trim()}>
-            {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-          </Button>
-        </form>
-      </div>
+      <ChatInput onSend={handleSendMessage} isLoading={isLoading} />
     </div>
   )
 }
